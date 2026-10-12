@@ -2,7 +2,7 @@
 
 File Organizer is an Omarchy bar plugin for sorting files with rules. Choose a source and destination, preview where each file will go, and move the matches from a small Qt Quick window. An optional Go daemon can watch the source folder with Linux fanotify and handle new or changed files.
 
-![File Organizer showing three matching files and their destination folders in a preview](docs/media/preview.png)
+![File Organizer showing three matching files and their destination folders in a preview](preview.png)
 
 *The preview uses sample files. Nothing moves until you confirm in the window or start the daemon with `--apply`.*
 

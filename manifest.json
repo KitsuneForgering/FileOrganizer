@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "kitsuneforgering.fileorganizer",
   "name": "File Organizer",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "author": "KitsuneForgering",
   "description": "Organize files with rules, a Qt Quick window, and an optional fanotify daemon.",
   "kinds": ["bar-widget"],

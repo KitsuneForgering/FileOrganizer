@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1
+
+- Place the real interface preview at the repository root so the Omarchy plugin directory can display it.
+
 ## 0.2.0
 
 - Add an experimental fanotify daemon that watches files closed after writing or moved into the source folder.

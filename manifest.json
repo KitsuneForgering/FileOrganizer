@@ -2,14 +2,14 @@
   "schemaVersion": 1,
   "id": "kitsuneforgering.fileorganizer",
   "name": "File Organizer",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "KitsuneForgering",
-  "description": "Abre o organizador de arquivos por regras em Go e Qt Quick.",
+  "description": "Organize files with rules, a Qt Quick window, and an optional fanotify daemon.",
   "kinds": ["bar-widget"],
   "entryPoints": { "barWidget": "BarWidget.qml" },
   "barWidget": {
     "displayName": "File Organizer",
-    "description": "Abre o organizador de arquivos",
+    "description": "Open the rules and preview window",
     "category": "Utilities",
     "allowMultiple": false,
     "defaultSection": "right"

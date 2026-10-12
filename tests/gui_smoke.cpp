@@ -6,6 +6,7 @@
 #include <QJsonObject>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QQuickWindow>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTest>
@@ -29,6 +30,18 @@ private slots:
         QVERIFY(rules.first().toObject().contains("name_contains"));
         QVERIFY(rules.first().toObject().contains("name_fuzzy"));
         QVERIFY(rules.first().toObject().contains("mime_types"));
+
+        const QString capturePath = qEnvironmentVariable("FILEORGANIZER_CAPTURE_PATH");
+        if (!capturePath.isEmpty()) {
+            engine.rootObjects().first()->setProperty("height", 920);
+            QSignalSpy completed(&bridge, &OrganizerBridge::completed);
+            QVERIFY(QMetaObject::invokeMethod(engine.rootObjects().first(), "run", Q_ARG(QVariant, "preview")));
+            QVERIFY2(completed.wait(5000), "Preview did not complete for capture");
+            QTest::qWait(200);
+            auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
+            QVERIFY(window);
+            QVERIFY2(window->grabWindow().save(capturePath), "Could not save preview screenshot");
+        }
     }
 
     void bridgeRunsCore() {
@@ -66,6 +79,17 @@ private slots:
         QCOMPARE(applied.value("moved").toInt(), 1);
         QVERIFY(!file.exists());
         QVERIFY(QFile::exists(root.filePath("dest/Notes/note.txt")));
+    }
+
+    void savesSharedProfile() {
+        const QByteArray profile = R"({"source":"/tmp/source","destination":"/tmp/destination","rules":[]})";
+        OrganizerBridge bridge;
+        bridge.saveSettings(QString::fromUtf8(profile));
+        QCOMPARE(bridge.loadSettings().toUtf8(), profile);
+        const QString path = qEnvironmentVariable("XDG_CONFIG_HOME") + "/fileorganizer/profile.json";
+        QFile saved(path);
+        QVERIFY(saved.open(QIODevice::ReadOnly));
+        QCOMPARE(saved.readAll(), profile);
     }
 };
 

@@ -1,37 +1,70 @@
 # File Organizer
 
-Organizador de arquivos por regras para Omarchy. O núcleo é escrito em Go; a janela usa Qt Quick. Um widget da barra do Omarchy abre o aplicativo.
+File Organizer is an Omarchy bar plugin for sorting files with rules. Choose a source and destination, preview where each file will go, and move the matches from a small Qt Quick window. An optional Go daemon can watch the source folder with Linux fanotify and handle new or changed files.
 
-## O que já funciona
+![File Organizer showing three matching files and their destination folders in a preview](docs/media/preview.png)
 
-- Regras por extensão, nome exato ou parcial, padrão glob, regex, nome aproximado, tipo MIME e tamanho em bytes. A primeira regra correspondente vence.
-- Prévia dos arquivos que serão movidos e dos conflitos de nome.
-- Movimentação manual após confirmação, sem sobrescrever arquivos existentes.
-- Regras e pastas salvas para a próxima abertura.
-- Arquivos ocultos, links simbólicos e subpastas da origem são ignorados. A busca não é recursiva.
+*The preview uses sample files. Nothing moves until you confirm in the window or start the daemon with `--apply`.*
 
-O aplicativo copia o arquivo para o destino e remove a origem após concluir a cópia. Isso permite mover entre sistemas de arquivos diferentes. Se a remoção da origem falhar, a cópia permanece no destino e o erro aparece no resultado.
+## What it does
 
-## Como escrever regras
+- Match files by extension, exact or partial name, glob, regular expression, approximate name, MIME type, and size.
+- Combine conditions within a rule. The first matching rule chooses the destination folder.
+- Show matching files and name conflicts before a manual move. Existing destination files are never overwritten.
+- Save rules in `~/.config/fileorganizer/profile.json` so the window and daemon use the same profile.
 
-Uma regra precisa ter ao menos um critério. Campos preenchidos na mesma regra são combinados com **E**. Valores separados por vírgula em extensões ou tipos MIME são combinados com **OU**. Nome exato, glob e regex consideram letras maiúsculas e minúsculas; nome parcial e aproximado, extensões e tipos MIME não.
+The organizer scans regular files directly inside the source folder. It skips hidden files, symbolic links, and subfolders. Moving across filesystems copies the file and then removes the source; if removal fails, the copy remains and the operation reports an error.
 
-| Critério | Exemplo | Efeito |
+## Install on Omarchy
+
+You need Go 1.23+, CMake, Ninja, and Qt 6.5+ with Quick and Quick Controls 2. Omarchy's plugin command installs the bar widget; the second command builds and installs the Go and Qt executables into `~/.local/bin`.
+
+```sh
+omarchy plugin add https://github.com/KitsuneForgering/FileOrganizer.git --enable --yes
+make -C ~/.config/omarchy/plugins/kitsuneforgering.fileorganizer install
+```
+
+Click **Files** in the bar to open the organizer. The executables also need `~/.local/bin` on the shell's `PATH`.
+
+To update, run `omarchy plugin update kitsuneforgering.fileorganizer --yes`, then repeat the `make -C … install` command. Omarchy updates the plugin checkout but does not rebuild external executables.
+
+To remove it, run `make -C ~/.config/omarchy/plugins/kitsuneforgering.fileorganizer uninstall` before `omarchy plugin remove kitsuneforgering.fileorganizer --yes`. Your rules in `~/.config/fileorganizer/profile.json` remain available for a later install.
+
+## First use
+
+1. Choose the folder containing files and the destination folder.
+2. Review the starter rules or select **Edit** to change one. Use **Other conditions** for names, regex, MIME, and size.
+3. Select **Preview**. Review the destination beside each matching file.
+4. Select **Move** and confirm to organize the current files.
+
+The window saves changes as you edit. A rule needs a destination folder and at least one condition. Conditions in one rule are combined with **AND**; comma separated extensions or MIME types use **OR**.
+
+| Condition | Example | Match |
 | --- | --- | --- |
-| Extensões | `pdf, docx` | Nome termina em uma dessas extensões. |
-| Nome exato | `Relatório.pdf` | Nome completo é igual. |
-| Nome contém | `fatura` | Corresponde a `Fatura-março.pdf`, sem distinguir maiúsculas. |
-| Glob | `fatura-*.pdf` | `*`, `?` e classes como `[0-9]`. |
-| Regex | `^IMG_[0-9]+\.jpg$` | Expressão regular de Go aplicada ao nome completo. |
-| Nome aproximado | `relatorio.pdf`, até 1 diferença | Corresponde a `relatrio.pdf`. Compara o nome completo; 1 diferença é o padrão, com limite configurável de 1 a 3. |
-| Tipos MIME | `image/*, application/pdf` | Tipo detectado pelo conteúdo. |
-| Tamanho | mínimo `1024`, máximo `1048576` | Arquivo tem de 1 KiB a 1 MiB, inclusive. |
+| Extensions | `pdf, docx` | Either extension |
+| Name contains | `invoice` | Case insensitive substring |
+| Exact name | `Report.pdf` | Full filename, case sensitive |
+| Glob | `invoice-*.pdf` | Full filename pattern |
+| Name regex | `^IMG_[0-9]+\.jpg$` | Go regular expression on the full filename |
+| Similar name | `report.pdf`, 1 difference | Full filename within 1–3 edits |
+| MIME types | `image/*, application/pdf` | Type detected from file content |
+| Size | `1024` to `1048576` bytes | Inclusive range |
 
-O tipo MIME é detectado a partir dos primeiros 512 bytes, sem confiar na extensão. Alguns formatos contêiner, como DOCX, podem ser identificados como ZIP. Para eles, use extensão ou nome quando precisar diferenciá-los.
+MIME detection reads the first 512 bytes. Container formats such as DOCX can appear as ZIP; use an extension or name rule when you need to tell them apart.
 
-## Desenvolvimento
+## Optional automatic mode
 
-Requisitos: Go 1.23+, CMake, Ninja e Qt 6.5+ com os módulos Quick e Quick Controls 2.
+After saving a profile in the window, start the daemon in a terminal. Its default mode only reports what it would do, as one JSON event per line:
+
+```sh
+fileorganizer-daemon
+```
+
+Run `fileorganizer-daemon --apply` to move matching new or modified files. The daemon does not move existing files just because it starts, but a later modification can trigger a move. Stop it with Ctrl+C. It reads the profile only at startup, so restart it after changing rules. It runs in the foreground; this release does not install or enable a background service. A file reopened for further writing can produce another close event; try preview mode with your workflow before enabling automatic moves.
+
+Use `-config /path/to/profile.json` for a different profile and `-settle 2s` to change the default 750 ms delay after an event.
+
+## Build from source
 
 ```sh
 make build
@@ -39,38 +72,4 @@ make test
 make run
 ```
 
-O executável Qt e o núcleo Go ficam em `build/bin/`. A interface espera encontrar `fileorganizer-core` no mesmo diretório de `fileorganizer`.
-
-`make test` executa os testes Go de regras, proteção dos arquivos e protocolo JSON. Também abre a janela Qt Quick em modo sem tela e verifica a comunicação com o núcleo nas ações de prévia e movimentação.
-
-## Usar no Omarchy
-
-Instale os dois executáveis no diretório pessoal:
-
-```sh
-make install
-```
-
-Depois que este repositório estiver publicado com o `manifest.json` e o `BarWidget.qml`, adicione o plugin:
-
-```sh
-omarchy plugin add https://github.com/KitsuneForgering/FileOrganizer.git --enable
-```
-
-O widget **Files** abre a janela pelo comando `fileorganizer`. O instalador de plugins do Omarchy não executa etapas de build; por isso os executáveis precisam estar instalados antes de usar o widget.
-
-Para validar o manifesto localmente:
-
-```sh
-omarchy plugin validate .
-```
-
-## Protocolo do núcleo
-
-O núcleo também pode ser chamado sem a interface. Ele lê um objeto JSON da entrada padrão e devolve o resultado em JSON:
-
-```sh
-printf '%s\n' '{"source":"/home/user/Downloads","destination":"/home/user/Organizados","rules":[{"extensions":["pdf","docx"],"folder":"Documentos"}]}' | build/bin/fileorganizer-core preview
-```
-
-Troque `preview` por `apply` para executar as regras. `apply` examina a pasta novamente; a lista pode mudar se arquivos forem adicionados ou removidos desde a prévia.
+The executables are written to `build/bin/`. The window expects `fileorganizer-core` beside `fileorganizer`. The tests cover the rule engine, moves, fanotify events, and a Qt Quick smoke test. See [CHANGELOG.md](CHANGELOG.md) for version history.

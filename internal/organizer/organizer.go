@@ -235,6 +235,24 @@ func detectMIME(path string) (string, error) {
 }
 
 func Preview(req Request) (Result, error) {
+	return preview(req, nil)
+}
+
+// PreviewNames plans only the listed basenames. It is used by the daemon to
+// avoid moving files that existed before a filesystem event.
+func PreviewNames(req Request, names []string) (Result, error) {
+	return preview(req, nameSet(names))
+}
+
+func nameSet(names []string) map[string]bool {
+	selected := make(map[string]bool, len(names))
+	for _, name := range names {
+		selected[name] = true
+	}
+	return selected
+}
+
+func preview(req Request, selected map[string]bool) (Result, error) {
 	source, dest, compiled, err := validate(req)
 	if err != nil {
 		return Result{}, err
@@ -246,6 +264,9 @@ func Preview(req Request) (Result, error) {
 	result := Result{Moves: []Move{}, Errors: []string{}}
 	for _, entry := range entries {
 		name := entry.Name()
+		if selected != nil && !selected[name] {
+			continue
+		}
 		if strings.HasPrefix(name, ".") || entry.Type()&os.ModeSymlink != 0 {
 			result.Skipped++
 			continue
@@ -294,7 +315,16 @@ func Preview(req Request) (Result, error) {
 // Apply repeats the scan so files added after preview are handled by the current rules.
 // Copy with O_EXCL prevents overwriting an existing target, including one created during the copy.
 func Apply(req Request) (Result, error) {
-	result, err := Preview(req)
+	return apply(req, nil)
+}
+
+// ApplyNames moves only selected basenames. Other matching files stay untouched.
+func ApplyNames(req Request, names []string) (Result, error) {
+	return apply(req, nameSet(names))
+}
+
+func apply(req Request, selected map[string]bool) (Result, error) {
+	result, err := preview(req, selected)
 	if err != nil {
 		return Result{}, err
 	}

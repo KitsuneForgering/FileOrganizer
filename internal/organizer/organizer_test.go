@@ -376,5 +376,29 @@ func TestRejectInvalidFuzzyThreshold(t *testing.T) {
 	}
 }
 
+func TestApplyNamesDoesNotMoveOtherMatches(t *testing.T) {
+	base := t.TempDir()
+	source, dest := filepath.Join(base, "source"), filepath.Join(base, "dest")
+	if err := os.Mkdir(source, 0755); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"old.txt", "new.txt"} {
+		if err := os.WriteFile(filepath.Join(source, name), []byte(name), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	req := Request{Source: source, Destination: dest, Rules: []Rule{{Extensions: []string{"txt"}, Folder: "Notes"}}}
+	result, err := ApplyNames(req, []string{"new.txt"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Moved != 1 || len(result.Moves) != 1 || result.Moves[0].Name != "new.txt" {
+		t.Fatalf("wrong selection: %+v", result)
+	}
+	if _, err := os.Stat(filepath.Join(source, "old.txt")); err != nil {
+		t.Fatalf("unselected file was moved: %v", err)
+	}
+}
+
 func int64ptr(value int64) *int64 { return &value }
 func intptr(value int) *int       { return &value }
